@@ -1,16 +1,10 @@
-# React + Vite
+# Pinterest Clone — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is the frontend for a Pinterest-style image sharing web application. It allows users to create profiles, upload images or short videos, like and comment on pins, follow other users, create boards, and save pins for later viewing. The frontend is built using React with TypeScript, Vite, and Tailwind CSS, and it connects to a backend powered by Node.js, Express, MongoDB (Atlas), and Cloudinary for media uploads. The application is deployed with the frontend on Netlify and the backend on Render. Users can register, log in, and log out of their accounts. They can create and edit personal boards, upload and manage pins that can be images or videos, like and comment on other users’ pins, follow and unfollow users, and save pins for later viewing. The grid layout is responsive and adapts to all screen sizes, similar to Pinterest’s interface. To set up the environment, create a .env file in the project root with the following values:
 
-Currently, two official plugins are available:
+VITE_API_URL=https://pinterest-backend-088x.onrender.com  
+VITE_SUPABASE_PROJECT_ID=  
+VITE_SUPABASE_PUBLISHABLE_KEY=  
+VITE_SUPABASE_URL=
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+To run the project locally, install dependencies with npm install and start the development server using npm run dev. The application will be available at http://localhost:5173. To prepare for production, use npm run build to generate optimized static files. The folder structure follows a modular layout, with separate folders for components, pages, contexts, hooks, and libraries inside the src directory, and all public assets stored in the public directory. This architecture makes it easy to extend features such as boards, saved pins, and notifications in the future. The entire project is part of a larger Pinterest-style ecosystem that integrates a backend API for handling authentication, image management, and user interactions efficiently.
