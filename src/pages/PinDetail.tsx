@@ -1,172 +1,268 @@
+// src/pages/PinDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
+import ShareModal from "@/components/ShareModal";
+import CommentBox from "@/components/CommentBox";
+import MoreOptionsDropdown from "@/components/MoreOptionsDropdown";
+import SaveToBoardDialog from "@/components/SaveToBoardDialog";
+import LikesModal from "@/components/LikesModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PinData {
-  id: string;
+  _id: string;
   mediaUrl: string;
   mediaType: "image" | "video";
   title?: string;
   description?: string;
   user?: {
+    _id: string;
     username: string;
-    avatar?: string;
-  };
+    profilePicture?: string | null;
+  } | null;
+  likesUsers?: any[];
+  likesCount?: number;
 }
 
 const PinDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user: currentUser, token } = useAuth();
+  const { toast } = useToast();
+  const apiUrl =
+    import.meta.env.VITE_API_URL ||
+    "https://pinterest-backend-088x.onrender.com";
+
   const [pin, setPin] = useState<PinData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [likesUsers, setLikesUsers] = useState<any[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
 
-  useEffect(() => {
-    const fetchPin = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || "https://pinterest-backend-088x.onrender.com";
-        const response = await fetch(`${apiUrl}/api/pins/${id}`);
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch pin");
-        }
-        
-        const data = await response.json();
-        setPin(data);
-      } catch (error) {
-        console.error("Error fetching pin:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load pin. Please try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showComments, setShowComments] = useState(true);
+
+  const loadPin = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/pins/${id}/full`);
+      if (!res.ok) throw new Error("Pin not found");
+
+      const data = await res.json();
+      setPin(data);
+      setLikesUsers(data.likesUsers || []);
+      setLikesCount(data.likesCount || 0);
+
+      if (currentUser) {
+        setIsLiked(
+          (data.likesUsers || []).some(
+            (u: any) => u?._id === currentUser.id
+          )
+        );
       }
-    };
-
-    if (id) {
-      fetchPin();
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to load pin",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [id, toast]);
-
-  const handleSave = () => {
-    // TODO: Implement save functionality
-    toast({
-      title: "Saved!",
-      description: "Pin saved to your board",
-    });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="text-muted-foreground">Loading...</div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    loadPin();
+  }, [id, token]);
 
-  if (!pin) {
+  const handleLike = async () => {
+    if (!currentUser) return navigate("/auth");
+
+    try {
+      await fetch(`${apiUrl}/api/pins/${id}/likes`, {
+        method: isLiked ? "DELETE" : "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await loadPin();
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to like",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading)
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Pin not found</h2>
-            <Button onClick={() => navigate("/")} variant="outline">
-              Go back to feed
-            </Button>
-          </div>
+        <div className="h-screen flex justify-center items-center">
+          Loading…
         </div>
       </div>
     );
-  }
+
+  if (!pin)
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="h-screen flex justify-center items-center">
+          Pin not found
+        </div>
+      </div>
+    );
+
+  const safeUser =
+    pin.user || ({
+      _id: "deleted",
+      username: "Deleted User",
+      profilePicture: null,
+    } as any);
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto py-6 px-4">
         <Button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(-1)}
           variant="ghost"
           className="mb-6"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to feed
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
-        <div className="max-w-5xl mx-auto">
-          <div className="bg-card rounded-3xl shadow-lg overflow-hidden">
-            <div className="grid md:grid-cols-2 gap-0">
-              <div className="bg-muted flex items-center justify-center p-8">
-                {pin.mediaType === "image" ? (
-                  <img
-                    src={pin.mediaUrl}
-                    alt={pin.title || "Pin"}
-                    className="max-w-full h-auto rounded-2xl shadow-md object-contain"
-                  />
-                ) : (
-                  <video
-                    src={pin.mediaUrl}
-                    controls
-                    className="max-w-full h-auto rounded-2xl shadow-md"
-                  />
-                )}
-              </div>
-              
-              <div className="p-8 flex flex-col">
-                <div className="flex-1">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex-1">
-                      {pin.user && (
-                        <div className="flex items-center gap-3 mb-4">
-                          {pin.user.avatar ? (
-                            <img
-                              src={pin.user.avatar}
-                              alt={pin.user.username}
-                              className="w-12 h-12 rounded-full"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                              <span className="text-lg font-semibold text-muted-foreground">
-                                {pin.user.username.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold text-foreground">{pin.user.username}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      onClick={handleSave}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-                    >
-                      Save
-                    </Button>
-                  </div>
+        <div className="max-w-5xl mx-auto bg-card rounded-3xl shadow-lg overflow-hidden">
+          <div className="grid md:grid-cols-2">
+            {/* MEDIA */}
+            <div className="bg-muted flex justify-center items-center p-8">
+              {pin.mediaType === "image" ? (
+                <img
+                  src={pin.mediaUrl}
+                  className="max-w-full object-contain rounded-2xl"
+                />
+              ) : (
+                <video
+                  src={pin.mediaUrl}
+                  controls
+                  className="max-w-full rounded-2xl"
+                />
+              )}
+            </div>
 
-                  {pin.title && (
-                    <h1 className="text-3xl font-bold mb-4 text-foreground">{pin.title}</h1>
-                  )}
-                  
-                  {pin.description && (
-                    <p className="text-muted-foreground leading-relaxed">{pin.description}</p>
-                  )}
+            {/* RIGHT SIDE */}
+            <div className="p-8 flex flex-col">
+              {/* OWNER */}
+              <div
+                className="flex items-center gap-3 mb-6 cursor-pointer"
+                onClick={() => navigate(`/profile/${safeUser.username}`)}
+              >
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={safeUser.profilePicture || undefined} />
+                  <AvatarFallback>
+                    {safeUser.username[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="font-semibold">{safeUser.username}</p>
+              </div>
+
+              {pin.title && (
+                <h1 className="text-3xl font-bold mb-4">{pin.title}</h1>
+              )}
+
+              {pin.description && (
+                <p className="text-muted-foreground mb-6">
+                  {pin.description}
+                </p>
+              )}
+
+              {/* ACTIONS */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={handleLike}
+                    className="flex items-center gap-2"
+                  >
+                    <Heart
+                      className={`w-6 h-6 ${
+                        isLiked
+                          ? "text-red-500 fill-red-500"
+                          : "text-foreground"
+                      }`}
+                    />
+                    <span className="font-medium">{likesCount}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowComments((v) => !v)}
+                    className="flex items-center gap-2"
+                  >
+                    <MessageCircle className="w-6 h-6" />
+                    <span>{commentCount}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Share2 className="w-6 h-6" />
+                    Share
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setShowSaveDialog(true)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Save
+                  </Button>
+                  <MoreOptionsDropdown
+                    imageUrl={pin.mediaUrl}
+                    title={pin.title}
+                  />
                 </div>
               </div>
+
+              {showComments && (
+                <CommentBox
+                  pinId={pin._id}
+                  pinOwnerId={safeUser._id}
+                  onCommentsChange={setCommentCount}
+                />
+              )}
             </div>
           </div>
         </div>
       </main>
+
+      <ShareModal
+        open={showShareModal}
+        onOpenChange={setShowShareModal}
+        pinId={pin._id}
+        imageUrl={pin.mediaUrl}
+        title={pin.title}
+      />
+
+      <SaveToBoardDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        pinId={pin._id}
+      />
+
+      <LikesModal
+        open={showLikesModal}
+        onOpenChange={setShowLikesModal}
+        users={likesUsers}
+      />
     </div>
   );
 };

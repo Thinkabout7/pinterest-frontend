@@ -21,9 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 const createPinSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(100, "Title must be less than 100 characters"),
-  description: z.string().trim().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
-  category: z.string().min(1, "Category is required"),
+  title: z.string().trim().optional(),
+  description: z.string().trim().optional(),
+  category: z.string().optional(),
 });
 
 const createBoardSchema = z.object({
@@ -122,46 +122,18 @@ const Create = () => {
     setIsUploading(true);
 
     try {
-      // 1) Upload media to /api/upload to get a file URL
-      const uploadForm = new FormData();
-      uploadForm.append('media', selectedFile);
+      // Build the request using FormData
+      const formData = new FormData();
+      formData.append("media", selectedFile);
+      formData.append("title", data.title);
+      formData.append("description", data.description);
+      formData.append("category", data.category);
 
-      const uploadRes = await fetch(`${apiUrl}/api/upload`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: uploadForm,
-      });
-
-      if (!uploadRes.ok) {
-        const txt = await uploadRes.text().catch(() => '');
-        console.error('Upload to /api/upload failed:', uploadRes.status, txt);
-        throw new Error('Failed to upload media');
-      }
-
-      const uploadData = await uploadRes.json();
-      const fileUrl = uploadData.fileUrl || uploadData.url || uploadData.media || uploadData.mediaUrl || uploadData.imageUrl || uploadData.data?.url || uploadData.data?.media;
-      if (!fileUrl) {
-        console.error('Upload response missing file URL:', uploadData);
-        throw new Error('Upload did not return a file URL');
-      }
-
-      // 2) Create the pin using the returned fileUrl as mediaUrl
-      const pinBody = {
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        mediaUrl: fileUrl,
-      };
-
-      console.log('Creating pin with mediaUrl:', fileUrl);
-
+      // Send the request
       const response = await fetch(`${apiUrl}/api/pins`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(pinBody),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
       });
 
       if (!response.ok) {
@@ -176,11 +148,17 @@ const Create = () => {
         throw new Error(errorMessage);
       }
 
+      const result = await response.json();
+
       toast({
         title: "Success!",
         description: "Your pin has been created",
       });
 
+      // Clear form and navigate
+      pinForm.reset();
+      setSelectedFile(null);
+      setPreviewUrl("");
       navigate("/");
     } catch (error) {
       toast({
@@ -331,33 +309,29 @@ const Create = () => {
                       <Label htmlFor="title">Title</Label>
                       <Input
                         id="title"
-                        placeholder="Add your title"
+                        placeholder="Tell everyone what your pin is about"
                         {...pinForm.register("title")}
                         className="mt-2"
                       />
-                      {pinForm.formState.errors.title && (
-                        <p className="text-sm text-destructive mt-1">{pinForm.formState.errors.title.message}</p>
-                      )}
+                      
                     </div>
 
                     <div>
                       <Label htmlFor="description">Description</Label>
                       <Textarea
                         id="description"
-                        placeholder="Tell everyone what your pin is about"
+                        placeholder="Add a description for your pin"
                         rows={5}
                         {...pinForm.register("description")}
                         className="mt-2"
                       />
-                      {pinForm.formState.errors.description && (
-                        <p className="text-sm text-destructive mt-1">{pinForm.formState.errors.description.message}</p>
-                      )}
+                      
                     </div>
 
                     <div>
                       <Label htmlFor="category">Category</Label>
                       <Select
-                        value={selectedCategory}
+                        value={selectedCategory  || undefined}
                         onValueChange={(value) => pinForm.setValue("category", value)}
                       >
                         <SelectTrigger className="mt-2">
@@ -371,9 +345,7 @@ const Create = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      {pinForm.formState.errors.category && (
-                        <p className="text-sm text-destructive mt-1">{pinForm.formState.errors.category.message}</p>
-                      )}
+                      
                     </div>
 
                     <div className="pt-4">

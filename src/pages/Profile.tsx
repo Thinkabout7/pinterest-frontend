@@ -1,13 +1,20 @@
-import { useEffect, useState, useRef } from "react";
+//profile.tsx
+
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Settings, Upload, UserPlus, UserMinus } from "lucide-react";
+import { UserPlus, UserMinus, ArrowRight, Camera, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import MasonryGrid from "@/components/MasonryGrid";
 import PinCard from "@/components/PinCard";
-import CreateBoardDialog from "@/components/CreateBoardDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,35 +23,20 @@ interface Pin {
   title: string;
   description: string;
   mediaUrl?: string;
-  image?: string;
-  mediaType: string;
-  category: string;
-  isSaved?: boolean;
-  user: {
-    _id: string;
-    username: string;
-    email: string;
-  } | null;
+  mediaType: "video" | "image";
 }
 
 interface Board {
   _id: string;
   name: string;
-  description: string;
   coverImage?: string;
-  user: {
-    _id: string;
-    username: string;
-  };
   pins: Pin[];
-  createdAt: string;
 }
 
 interface UserProfile {
   _id: string;
   username: string;
-  email: string;
-  profilePicture?: string;
+  profilePicture?: string | null;
   followers?: string[];
   following?: string[];
 }
@@ -52,432 +44,434 @@ interface UserProfile {
 const Profile = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, updateUser } = useAuth();
+  const { toast } = useToast();
+
+  const apiUrl =
+    import.meta.env.VITE_API_URL ||
+    "https://pinterest-backend-088x.onrender.com";
+
+  const isOwnProfile = currentUser?.username === username;
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [createdPins, setCreatedPins] = useState<Pin[]>([]);
   const [savedPins, setSavedPins] = useState<Pin[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  const [uploadingProfilePicture, setUploadingProfilePicture] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL || "https://pinterest-backend-088x.onrender.com";
+  const [listOpen, setListOpen] = useState(false);
+  const [listType, setListType] =
+    useState<"followers" | "following">("followers");
+  const [listData, setListData] = useState<any[]>([]);
 
-  const getImageSrc = (src: string) => src && src.startsWith('/uploads') ? `${apiUrl}${src}` : src;
-
+  /* LOAD PROFILE */
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const load = async () => {
       if (!username) return;
 
+      setIsLoading(true);
+
       try {
-        setIsLoading(true);
-        
-        // Fetch user profile
-        const profileRes = await fetch(`${apiUrl}/api/users/${username}`);
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
+        const res = await fetch(`${apiUrl}/api/users/${username}`);
+        if (res.ok) {
+          const data = await res.json();
+
           setProfile({
-            _id: profileData.user._id || profileData.user.id,
-            username: profileData.user.username,
-            email: profileData.user.email,
-            profilePicture: profileData.user.profilePicture,
-            followers: profileData.user.followers || [],
-            following: profileData.user.following || []
+            _id: data.user._id,
+            username: data.user.username,
+            profilePicture: data.user.profilePicture || null,
+            followers: data.user.followers || [],
+            following: data.user.following || [],
           });
-          
-          // Set pins from the profile response
-          if (profileData.pins) {
-            setCreatedPins(profileData.pins);
-          }
-          
-          // Check if current user is following this profile
-          if (currentUser && profileData.user.followers) {
-            setIsFollowing(profileData.user.followers.includes(currentUser.id));
+
+          setCreatedPins(data.pins || []);
+
+          if (currentUser?.id) {
+            setIsFollowing(data.user.followers.includes(currentUser.id));
           }
         }
 
-        // Fetch boards
-        try {
-          const boardsRes = await fetch(`${apiUrl}/api/users/${username}/boards`);
-          if (boardsRes.ok) {
-            const userBoards = await boardsRes.json();
-            setBoards(userBoards);
-          }
-        } catch (error) {
-          console.log("Boards endpoint not available yet");
-        }
+        const b = await fetch(`${apiUrl}/api/users/${username}/boards`);
+        if (b.ok) setBoards(await b.json());
 
-        // Fetch saved pins
-        try {
-          const token = localStorage.getItem('auth_token');
-          const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-          };
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-          
-          const savedPinsRes = await fetch(`${apiUrl}/api/users/${username}/saved-pins`, {
-            headers
-          });
-          if (savedPinsRes.ok) {
-            const userSavedPins = await savedPinsRes.json();
-            setSavedPins(userSavedPins);
-          }
-        } catch (error) {
-          console.log("Saved pins endpoint not available yet");
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      } finally {
-        setIsLoading(false);
+        if (isOwnProfile) await loadSavedPins();
+      } catch (err) {
+        console.error("Profile load error:", err);
       }
+
+      setIsLoading(false);
     };
 
-    fetchUserProfile();
-  }, [username, apiUrl, currentUser]);
+    load();
+  }, [username, currentUser]);
 
-  const isOwnProfile = currentUser?.username === username;
+  /* LOAD SAVED PINS */
+  const loadSavedPins = async () => {
+    if (!isOwnProfile) return;
+    const token = localStorage.getItem("auth_token");
 
-  const handleSaveChange = (pinId: string, isSaved: boolean) => {
-    setCreatedPins(prevPins => 
-      prevPins.map(pin => 
-        pin._id === pinId ? { ...pin, isSaved } : pin
-      )
-    );
-    setSavedPins(prevPins => 
-      isSaved ? prevPins : prevPins.filter(pin => pin._id !== pinId)
-    );
-  };
-
-  const handleFollowToggle = async () => {
-    if (!currentUser || !username) return;
-    
-    setFollowLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const endpoint = isFollowing ? 'unfollow' : 'follow';
-      
-      const response = await fetch(`${apiUrl}/api/users/${username}/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const res = await fetch(`${apiUrl}/api/users/${username}/saved-pins`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.ok) {
-        setIsFollowing(!isFollowing);
-        setProfile(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            followers: isFollowing 
-              ? (prev.followers || []).filter(id => id !== currentUser.id)
-              : [...(prev.followers || []), currentUser.id]
-          };
-        });
-        
-        toast({
-          title: "Success",
-          description: isFollowing ? "Unfollowed successfully" : "Following successfully",
-        });
-      } else {
-        throw new Error('Failed to update follow status');
+      if (res.ok) {
+        setSavedPins(await res.json());
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update follow status",
-        variant: "destructive",
-      });
-    } finally {
-      setFollowLoading(false);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  /* UPLOAD PROFILE IMAGE */
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !username) return;
+    if (!file) return;
 
-    setUploadingProfilePicture(true);
     try {
-      // Show preview before upload
-      const previewUrl = URL.createObjectURL(file);
-      setProfile(prev => prev ? { ...prev, profilePicture: previewUrl } : null);
+      const token = localStorage.getItem("auth_token");
+      const formData = new FormData();
+      formData.append("profilePicture", file);
 
-      // 1) Upload file to /api/upload
-      const uploadForm = new FormData();
-      uploadForm.append('file', file);
-
-      const token = localStorage.getItem('auth_token');
-      const uploadRes = await fetch(`${apiUrl}/api/upload`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: uploadForm,
+      const res = await fetch(`${apiUrl}/api/profile/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
 
-      if (!uploadRes.ok) {
-        const text = await uploadRes.text().catch(() => '');
-        console.error('Upload failed:', uploadRes.status, text);
-        throw new Error('Upload failed');
-      }
+      const data = await res.json();
 
-      const uploadData = await uploadRes.json();
-      const fileUrl = uploadData.fileUrl || uploadData.url || uploadData.media || uploadData.mediaUrl || uploadData.imageUrl || uploadData.data?.url || uploadData.data?.media;
-      if (!fileUrl) {
-        console.error('Upload response missing file URL:', uploadData);
-        throw new Error('Upload response missing file URL');
-      }
+      setProfile((p) => (p ? { ...p, profilePicture: data.fileUrl } : p));
+      updateUser({ profilePicture: data.fileUrl });
 
-      // 2) Send fileUrl to profile update endpoint
-      const updateHeaders: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      if (token) updateHeaders['Authorization'] = `Bearer ${token}`;
-
-      const updateRes = await fetch(`${apiUrl}/api/profile/update`, {
-        method: 'POST',
-        headers: updateHeaders,
-        body: JSON.stringify({ profilePicture: fileUrl }),
-      });
-
-      if (!updateRes.ok) {
-        const text = await updateRes.text().catch(() => '');
-        console.error('Profile update failed:', updateRes.status, text);
-        throw new Error('Failed to update profile');
-      }
-
-      // Accept either the updated profile or a success object
-      let updated: any = null;
-      try {
-        updated = await updateRes.json();
-      } catch (err) {
-        // no json, ignore
-      }
-
-      // Update UI: if backend returned updated profile, use it; otherwise set profilePicture directly
-      if (updated && updated.profilePicture) {
-        setProfile(prev => prev ? { ...prev, profilePicture: updated.profilePicture } : null);
-      } else {
-        setProfile(prev => prev ? { ...prev, profilePicture: fileUrl } : null);
-      }
-
-      // Clean up preview URL
-      URL.revokeObjectURL(previewUrl);
-
-      toast({
-        title: 'Success',
-        description: 'Profile picture updated successfully',
-      });
-    } catch (error: any) {
-      console.error('Profile picture upload error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to upload profile picture',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadingProfilePicture(false);
+      toast({ title: "Profile picture updated" });
+    } catch (err) {
+      toast({ title: "Upload failed", variant: "destructive" });
     }
   };
 
+  /* REMOVE PROFILE IMAGE */
+  const handleRemove = async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+
+      const res = await fetch(`${apiUrl}/api/profile/update`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ profilePicture: "" }),
+      });
+
+      const data = await res.json();
+
+      setProfile((p) => (p ? { ...p, profilePicture: null } : p));
+      updateUser({ profilePicture: null });
+
+      toast({ title: "Profile picture removed" });
+    } catch {
+      toast({ title: "Failed to remove", variant: "destructive" });
+    }
+  };
+
+  /* FOLLOW / UNFOLLOW */
+  const handleFollowToggle = async () => {
+    if (!currentUser?.id || !profile?._id) return;
+
+    setFollowLoading(true);
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const endpoint = isFollowing ? "unfollow" : "follow";
+
+      const res = await fetch(
+        `${apiUrl}/api/follow/${profile._id}/${endpoint}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.ok) {
+        setIsFollowing(!isFollowing);
+
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                followers: isFollowing
+                  ? prev.followers?.filter((id) => id !== currentUser.id)
+                  : [...(prev.followers || []), currentUser.id],
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    setFollowLoading(false);
+  };
+
+  /* FOLLOW LIST */
+  const openFollowList = async (type: "followers" | "following") => {
+    if (!profile?._id) return;
+
+    setListType(type);
+    setListOpen(true);
+
+    try {
+      const res = await fetch(`${apiUrl}/api/follow/${profile._id}/${type}`);
+      if (res.ok) {
+        setListData(await res.json());
+      }
+    } catch {
+      setListData([]);
+    }
+  };
+
+  /* UI */
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-8">
-        {isLoading ? (
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="text-muted-foreground">Loading profile...</div>
-          </div>
-        ) : profile ? (
-          <div className="space-y-8">
-            {/* Profile Header */}
+        {isLoading || !profile ? (
+          <div className="text-center py-20 text-muted-foreground">Loading…</div>
+        ) : (
+          <>
+            {/* HEADER */}
             <div className="flex flex-col items-center gap-4 py-8">
-              <div className="relative group">
-                <Avatar className="w-32 h-32">
-                  <AvatarImage src={getImageSrc(profile.profilePicture)} />
-                  <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                    {profile.username?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                {isOwnProfile && (
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute bottom-0 right-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingProfilePicture}
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleProfilePictureUpload}
-                  disabled={uploadingProfilePicture}
-                />
-              </div>
               
-              <div className="text-center space-y-2">
-                <h1 className="text-4xl font-bold text-foreground">
-                  {profile.username}
-                </h1>
-                <p className="text-lg text-muted-foreground">{profile.email}</p>
-                
-                <div className="flex gap-6 justify-center pt-2">
-                  <div className="text-center">
-                    <div className="font-semibold text-foreground">{profile.followers?.length || 0}</div>
-                    <div className="text-sm text-muted-foreground">Followers</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-semibold text-foreground">{profile.following?.length || 0}</div>
-                    <div className="text-sm text-muted-foreground">Following</div>
-                  </div>
-                </div>
+              {/* AVATAR + CONTROLS */}
+              <div className="relative group w-32 h-32">
+                <Avatar className="w-32 h-32">
+                  {profile.profilePicture ? (
+                    <AvatarImage src={profile.profilePicture} />
+                  ) : (
+                    <AvatarFallback>
+                      {profile.username.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+
+                {isOwnProfile && (
+                  <>
+                    {/* Upload button */}
+                    <label
+                      htmlFor="upload-input"
+                      className="absolute bottom-1 left-1 bg-black/70 text-white p-2 rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </label>
+
+                    <input
+                      id="upload-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleUpload}
+                    />
+
+                    {/* Delete button only if picture exists */}
+                    {profile.profilePicture && (
+                      <button
+                        onClick={handleRemove}
+                        className="absolute bottom-1 right-1 bg-red-600 text-white p-2 rounded-full"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
 
-              {isOwnProfile ? (
-                <Button variant="secondary" className="gap-2">
-                  <Settings className="w-4 h-4" />
-                  Edit Profile
-                </Button>
-              ) : currentUser ? (
-                <Button 
+              <h1 className="text-4xl font-bold">{profile.username}</h1>
+
+              {/* FOLLOW COUNTS */}
+              <div className="flex gap-6 text-sm mt-1">
+                <p onClick={() => openFollowList("followers")} className="cursor-pointer">
+                  <strong>{profile.followers?.length || 0}</strong> Followers
+                </p>
+                <p onClick={() => openFollowList("following")} className="cursor-pointer">
+                  <strong>{profile.following?.length || 0}</strong> Following
+                </p>
+              </div>
+
+              {/* FOLLOW BUTTON */}
+              {!isOwnProfile && (
+                <Button
                   onClick={handleFollowToggle}
                   disabled={followLoading}
-                  variant={isFollowing ? "outline" : "default"}
-                  className="gap-2"
+                  className={
+                    isFollowing
+                      ? "bg-white text-black border border-black hover:bg-gray-100"
+                      : ""
+                  }
                 >
                   {isFollowing ? (
                     <>
-                      <UserMinus className="w-4 h-4" />
-                      Unfollow
+                      <UserMinus className="w-4 h-4 mr-2" /> Following
                     </>
                   ) : (
                     <>
-                      <UserPlus className="w-4 h-4" />
-                      Follow
+                      <UserPlus className="w-4 h-4 mr-2" /> Follow
                     </>
                   )}
                 </Button>
-              ) : null}
+              )}
             </div>
 
-            {/* Pins Tabs */}
-            <Tabs defaultValue="created" className="w-full">
-              <TabsList className="w-full max-w-2xl mx-auto grid grid-cols-3">
-                <TabsTrigger value="created">Created</TabsTrigger>
+            {/* TABS */}
+            <Tabs
+              defaultValue="created"
+              className="w-full"
+              onValueChange={(val) => {
+                if (val === "saved") loadSavedPins();
+              }}
+            >
+              <TabsList className="grid grid-cols-3 max-w-lg mx-auto">
+                <TabsTrigger value="created">Pins</TabsTrigger>
                 <TabsTrigger value="boards">Boards</TabsTrigger>
                 <TabsTrigger value="saved">Saved</TabsTrigger>
               </TabsList>
 
+              {/* CREATED */}
               <TabsContent value="created" className="mt-8">
-                {createdPins.length > 0 ? (
+                {createdPins.length ? (
                   <MasonryGrid>
-                    {createdPins.map((pin) => (
+                    {createdPins
+                      .filter((p) => p && p._id)
+                      .map((pin) => (
                       <PinCard
                         key={pin._id}
                         id={pin._id}
-                        mediaUrl={getImageSrc(pin.mediaUrl || pin.image)}
-                        mediaType={(pin.mediaType as "image" | "video") || "image"}
+                        imageUrl={pin.mediaUrl}
+                        mediaType={pin.mediaType}
                         title={pin.title}
                         description={pin.description}
-                        isSaved={pin.isSaved}
-                        onSaveChange={handleSaveChange}
+                        showEditButton={isOwnProfile}
                       />
                     ))}
                   </MasonryGrid>
                 ) : (
-                  <div className="text-center py-16 text-muted-foreground">
-                    No pins created yet
-                  </div>
+                  <p className="text-center py-12 text-muted-foreground">
+                    No pins yet
+                  </p>
                 )}
               </TabsContent>
 
+              {/* BOARDS */}
               <TabsContent value="boards" className="mt-8">
-                {isOwnProfile && (
-                  <div className="mb-6">
-                    <CreateBoardDialog onBoardCreated={(newBoard) => setBoards([newBoard, ...boards])} />
-                  </div>
-                )}
-                {boards.length > 0 ? (
+                {boards.length ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {boards.map((board) => (
+                    {boards
+                    .filter((b) => b && b._id)
+                    .map((board) => (
                       <div
                         key={board._id}
-                        className="group cursor-pointer rounded-lg overflow-hidden border border-border bg-card hover:shadow-lg transition-all"
                         onClick={() => navigate(`/board/${board._id}`)}
+                        className="cursor-pointer rounded-xl overflow-hidden border"
                       >
-                        <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
-                          {board.coverImage ? (
-                            <img
-                              src={getImageSrc(board.coverImage)}
-                              alt={board.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : board.pins.length > 0 ? (
-                            <img
-                              src={getImageSrc(board.pins[0].mediaUrl || board.pins[0].image)}
-                              alt={board.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="text-4xl text-muted-foreground">📌</div>
-                          )}
+                        <div className="aspect-[16/9] bg-muted">
+                          <img
+                            src={board.coverImage || board.pins?.[0]?.mediaUrl}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold text-foreground truncate">{board.name}</h3>
-                          <p className="text-sm text-muted-foreground">{board.pins.length} pins</p>
+                        <div className="p-3">
+                          <h3 className="font-semibold">{board.name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {board.pins.length} pins
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-muted-foreground">
-                    No boards created yet
-                  </div>
+                  <p className="text-center py-12 text-muted-foreground">
+                    No boards
+                  </p>
                 )}
               </TabsContent>
 
+              {/* SAVED */}
               <TabsContent value="saved" className="mt-8">
-                {savedPins.length > 0 ? (
+                {savedPins.length ? (
                   <MasonryGrid>
-                    {savedPins.map((pin) => (
+                    {savedPins
+                    .filter((p) => p && p._id)
+                    .map((pin) => (
                       <PinCard
                         key={pin._id}
                         id={pin._id}
-                        mediaUrl={getImageSrc(pin.mediaUrl || pin.image)}
-                        mediaType={(pin.mediaType as "image" | "video") || "image"}
+                        imageUrl={pin.mediaUrl}
+                        mediaType={pin.mediaType}
                         title={pin.title}
                         description={pin.description}
                         isSaved={true}
-                        onSaveChange={handleSaveChange}
+                        showSaveButton={true}
                       />
                     ))}
                   </MasonryGrid>
                 ) : (
-                  <div className="text-center py-16 text-muted-foreground">
-                    No saved pins yet
-                  </div>
+                  <p className="text-center py-12 text-muted-foreground">
+                    Nothing saved yet
+                  </p>
                 )}
               </TabsContent>
             </Tabs>
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <h2 className="text-2xl font-bold text-foreground mb-2">User not found</h2>
-            <p className="text-muted-foreground">The profile you're looking for doesn't exist.</p>
-          </div>
+          </>
         )}
       </main>
+
+      {/* FOLLOWERS / FOLLOWING MODAL */}
+      <Dialog open={listOpen} onOpenChange={setListOpen}>
+        <DialogContent className="max-w-sm z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="capitalize">{listType}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-[350px] overflow-y-auto">
+            {listData.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">
+                No {listType}
+              </p>
+            ) : (
+              listData.map((u) => (
+                <div
+                  key={u._id}
+                  onClick={() => {
+                    setListOpen(false);
+                    navigate(`/profile/${u.username}`);
+                  }}
+                  className="flex items-center gap-3 p-2 rounded hover:bg-accent cursor-pointer"
+                >
+                  <Avatar>
+                    {u.profilePicture ? (
+                      <AvatarImage src={u.profilePicture} />
+                    ) : (
+                      <AvatarFallback>
+                        {u.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+
+                  <div className="flex-1">
+                    <p className="font-medium">{u.username}</p>
+                  </div>
+
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

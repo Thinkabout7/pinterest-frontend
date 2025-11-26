@@ -1,10 +1,9 @@
+// src/components/PinCard.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Bookmark, BookmarkCheck, FolderPlus } from "lucide-react";
+import { Bookmark, BookmarkCheck, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import SaveToBoardDialog from "./SaveToBoardDialog";
 
 interface PinCardProps {
   id: string;
@@ -14,28 +13,43 @@ interface PinCardProps {
   title?: string;
   description?: string;
   isSaved?: boolean;
-  onSaveChange?: (pinId: string, isSaved: boolean) => void;
+  onSaveChange?: (pinId: string, nowSaved: boolean) => void;
   hideBoardButton?: boolean;
+  showSaveButton?: boolean;
+  showEditButton?: boolean;
 }
 
-const PinCard = ({ id, imageUrl, mediaUrl, mediaType = "image", title, description, isSaved = false, onSaveChange, hideBoardButton = false }: PinCardProps) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [saved, setSaved] = useState(isSaved);
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [showBoardDialog, setShowBoardDialog] = useState(false);
+const PinCard = ({
+  id,
+  imageUrl,
+  mediaUrl,
+  mediaType = "image",
+  title,
+  description,
+  isSaved = false,
+  onSaveChange,
+  hideBoardButton = false,
+  showSaveButton = false,
+  showEditButton = false,
+}: PinCardProps) => {
   const navigate = useNavigate();
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token, user } = useAuth();
   const { toast } = useToast();
 
-  const apiUrl = import.meta.env.VITE_API_URL || "https://pinterest-backend-088x.onrender.com";
+  const [saved, setSaved] = useState(isSaved);
+  const [loading, setLoading] = useState(false);
+
+  const apiUrl =
+    import.meta.env.VITE_API_URL ||
+    "https://pinterest-backend-088x.onrender.com";
 
   useEffect(() => {
     setSaved(isSaved);
   }, [isSaved]);
 
-  const handleSave = async (e: React.MouseEvent) => {
+  const handleSaveToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!isAuthenticated) {
       toast({
         title: "Login Required",
@@ -45,69 +59,53 @@ const PinCard = ({ id, imageUrl, mediaUrl, mediaType = "image", title, descripti
       navigate("/auth");
       return;
     }
-    
-    setSaveLoading(true);
+
+    setLoading(true);
+
     try {
-      const endpoint = saved ? 'unsave' : 'save';
-      
-      const response = await fetch(`${apiUrl}/api/pins/${id}/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const method = saved ? "DELETE" : "POST";
+
+      const res = await fetch(`${apiUrl}/api/saved/profile/${id}`, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.ok) {
-        setSaved(!saved);
-        onSaveChange?.(id, !saved);
-        toast({
-          title: saved ? "Unsaved" : "Saved!",
-          description: saved ? "Pin removed from your collection" : "Pin saved to your collection",
-        });
-      } else {
-        throw new Error('Failed to update save status');
-      }
-    } catch (error) {
+      if (!res.ok) throw new Error("Failed");
+
+      const newState = !saved;
+      setSaved(newState);
+      onSaveChange?.(id, newState);
+
+      toast({
+        title: newState ? "Saved!" : "Removed",
+        description: newState
+          ? "Pin saved to your profile"
+          : "Pin removed from your saved pins",
+      });
+    } catch {
       toast({
         title: "Error",
         description: "Failed to update save status",
         variant: "destructive",
       });
-    } finally {
-      setSaveLoading(false);
     }
+
+    setLoading(false);
   };
 
-  const handleView = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/pin/${id}`);
-  };
+  const handleView = () => navigate(`/pin/${id}`);
 
-  const handleAddToBoard = (e: React.MouseEvent) => {
+  const handleEditMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (!isAuthenticated) {
-      toast({
-        title: "Login Required",
-        description: "Please login to save to boards",
-        variant: "destructive",
-      });
-      navigate("/auth");
-      return;
-    }
-    
-    setShowBoardDialog(true);
+    navigate(`/pin/${id}/edit`);
   };
 
   return (
     <div
       className="relative group cursor-pointer break-inside-avoid mb-4"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={handleView}
     >
-      <div className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)] transition-shadow duration-300 hover:shadow-[var(--shadow-card-hover)]">
+      <div className="rounded-2xl overflow-hidden bg-card shadow-[var(--shadow-card)]">
         {mediaType === "video" ? (
           <video
             src={mediaUrl || imageUrl}
@@ -126,55 +124,38 @@ const PinCard = ({ id, imageUrl, mediaUrl, mediaType = "image", title, descripti
             loading="lazy"
           />
         )}
-        
-        {isHovered && (
-          <div className="absolute inset-0 bg-black/40 flex items-start justify-end p-4 transition-opacity duration-300">
-            <div className="flex gap-2">
-              {!hideBoardButton && (
-                <Button
-                  onClick={handleAddToBoard}
-                  size="sm"
-                  variant="secondary"
-                  className="bg-card/90 hover:bg-card gap-2"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                  Board
-                </Button>
-              )}
-              <Button
-                onClick={handleSave}
-                disabled={saveLoading}
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-2"
-              >
-                {saved ? (
-                  <>
-                    <BookmarkCheck className="w-4 h-4" />
-                    Saved
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-4 h-4" />
-                    Save
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
-      
+
       {title && (
         <div className="mt-2 px-2">
-          <p className="text-sm font-medium text-foreground line-clamp-2">{title}</p>
+          <p className="text-sm font-medium text-foreground line-clamp-2">
+            {title}
+          </p>
         </div>
       )}
 
-      <SaveToBoardDialog
-        open={showBoardDialog}
-        onOpenChange={setShowBoardDialog}
-        pinId={id}
-      />
+      {showSaveButton && (
+        <button
+          onClick={handleSaveToggle}
+          disabled={loading}
+          className="absolute top-2 right-2 bg-white rounded-full p-2 shadow animate-bounce"
+        >
+          {saved ? (
+            <BookmarkCheck className="w-5 h-5 text-primary" />
+          ) : (
+            <Bookmark className="w-5 h-5" />
+          )}
+        </button>
+      )}
+
+      {showEditButton && user && (
+        <button
+          onClick={handleEditMenu}
+          className="absolute bottom-2 right-2 bg-white rounded-full p-2 shadow opacity-0 group-hover:opacity-100 transition"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 };

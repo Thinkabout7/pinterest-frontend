@@ -1,4 +1,4 @@
-# Board Cover Image Feature - Implementation Summary
+npm# Board Cover Image Feature - Implementation Summary
 
 ## ✅ Features Implemented
 

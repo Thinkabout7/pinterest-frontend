@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,12 +13,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface Pin {
+  _id: string;
+  title?: string;
+  description?: string;
+  mediaUrl?: string;
+  image?: string;
+  mediaType?: "image" | "video";
+  category?: string;
+}
+
 interface Board {
   _id: string;
   name: string;
-  description: string;
+  description?: string;
   coverImage?: string;
-  pins: Array<{ _id: string }>;
+  pins: Pin[];
 }
 
 interface SaveToBoardDialogProps {
@@ -22,30 +37,39 @@ interface SaveToBoardDialogProps {
   pinId: string;
 }
 
-const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps) => {
+const SaveToBoardDialog = ({
+  open,
+  onOpenChange,
+  pinId,
+}: SaveToBoardDialogProps) => {
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
   const [newBoardDescription, setNewBoardDescription] = useState("");
-  const [creatingBoard, setCreatingBoard] = useState(false);
-  const { toast } = useToast();
 
-  const apiUrl = import.meta.env.VITE_API_URL || "https://pinterest-backend-088x.onrender.com";
+  const [creatingBoard, setCreatingBoard] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const { toast } = useToast();
+  const apiUrl =
+    import.meta.env.VITE_API_URL ||
+    "https://pinterest-backend-088x.onrender.com";
+
+  const userData = JSON.parse(localStorage.getItem("user") || "{}");
+  const token = localStorage.getItem("auth_token");
 
   useEffect(() => {
-    if (open) {
-      fetchBoards();
-    }
+    if (open) fetchBoards();
   }, [open]);
 
   const fetchBoards = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${apiUrl}/api/boards`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -54,7 +78,7 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
         setBoards(data);
       }
     } catch (error) {
-      console.error('Error fetching boards:', error);
+      console.error("Error fetching boards:", error);
     } finally {
       setLoading(false);
     }
@@ -64,14 +88,13 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
     if (!newBoardName.trim()) return;
 
     setCreatingBoard(true);
-    try {
-      const token = localStorage.getItem('auth_token');
 
+    try {
       const response = await fetch(`${apiUrl}/api/boards`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: newBoardName,
@@ -79,24 +102,25 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
         }),
       });
 
-      if (response.ok) {
-        const newBoard = await response.json();
-        setBoards([newBoard, ...boards]);
-        setNewBoardName("");
-        setNewBoardDescription("");
-        setShowCreateForm(false);
-        
-        // Auto-add pin to the newly created board
-        await handleAddToBoard(newBoard._id);
-        
-        toast({
-          title: "Success",
-          description: "Board created and pin added",
-        });
-      } else {
+      if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create board');
+        throw new Error(errorData.message || "Failed to create board");
       }
+
+      const newBoard = await response.json();
+
+      setBoards([newBoard, ...boards]);
+
+      setNewBoardName("");
+      setNewBoardDescription("");
+      setShowCreateForm(false);
+
+      await handleAddToBoard(newBoard._id);
+
+      toast({
+        title: "Success",
+        description: "Board created and pin added",
+      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -108,29 +132,57 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
     }
   };
 
-  const handleAddToBoard = async (boardId: string) => {
+  const handleSaveToProfile = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${apiUrl}/api/boards/${boardId}/pins/${pinId}`, {
-        method: 'POST',
+      const response = await fetch(`${apiUrl}/api/saved/profile/${pinId}`, {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      if (response.ok) {
-        // Update local state to show pin is in board
-        setBoards(boards.map(board => 
-          board._id === boardId 
+      if (!response.ok) throw new Error("Failed to save pin");
+
+      onOpenChange(false);
+      toast({
+        title: "Saved!",
+        description: "Pin saved to your profile",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save pin to profile",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddToBoard = async (boardId: string) => {
+    try {
+      const response = await fetch(
+        `${apiUrl}/api/boards/${boardId}/pins/${pinId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to add pin");
+
+      setBoards(
+        boards.map((board) =>
+          board._id === boardId
             ? { ...board, pins: [...board.pins, { _id: pinId }] }
             : board
-        ));
-        
-        toast({
-          title: "Success",
-          description: "Pin added to board",
-        });
-      }
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Pin added to board",
+      });
     } catch (error) {
       toast({
         title: "Error",
@@ -142,80 +194,75 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
 
   const handleRemoveFromBoard = async (boardId: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${apiUrl}/api/boards/${boardId}/pins/${pinId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${apiUrl}/api/boards/${boardId}/pins/${pinId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      if (response.ok) {
-        // Update local state to show pin is removed
-        setBoards(boards.map(board => 
-          board._id === boardId 
-            ? { ...board, pins: board.pins.filter(p => p._id !== pinId) }
+      if (!response.ok) throw new Error("Failed");
+
+      setBoards(
+        boards.map((board) =>
+          board._id === boardId
+            ? { ...board, pins: board.pins.filter((p) => p._id !== pinId) }
             : board
-        ));
-        
-        toast({
-          title: "Success",
-          description: "Pin removed from board",
-        });
-      }
+        )
+      );
+
+      toast({
+        title: "Removed",
+        description: "Pin removed from board",
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to remove pin from board",
+        description: "Failed to remove pin",
         variant: "destructive",
       });
     }
   };
 
-  const isPinInBoard = (board: Board) => {
-    return board.pins.some(p => p._id === pinId);
-  };
+  const isPinInBoard = (board: Board) =>
+    board.pins.some((p) => p._id === pinId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Save to Board</DialogTitle>
+          <DialogTitle>Save to</DialogTitle>
         </DialogHeader>
 
         {showCreateForm ? (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-board-name">Board Name</Label>
-              <Input
-                id="new-board-name"
-                value={newBoardName}
-                onChange={(e) => setNewBoardName(e.target.value)}
-                placeholder="Enter board name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-board-description">Description (Optional)</Label>
-              <Textarea
-                id="new-board-description"
-                value={newBoardDescription}
-                onChange={(e) => setNewBoardDescription(e.target.value)}
-                placeholder="Enter board description"
-                rows={3}
-              />
-            </div>
+            <Label>Board Name</Label>
+            <Input
+              value={newBoardName}
+              onChange={(e) => setNewBoardName(e.target.value)}
+              placeholder="Board name"
+            />
+
+            <Label>Description</Label>
+            <Textarea
+              value={newBoardDescription}
+              onChange={(e) => setNewBoardDescription(e.target.value)}
+              placeholder="Optional description"
+            />
+
             <div className="flex gap-2">
               <Button
                 onClick={handleCreateBoard}
-                disabled={!newBoardName.trim() || creatingBoard}
                 className="flex-1"
+                disabled={!newBoardName.trim() || creatingBoard}
               >
                 {creatingBoard ? "Creating..." : "Create"}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateForm(false)}
-              >
+
+              <Button variant="outline" onClick={() => setShowCreateForm(false)}>
                 Cancel
               </Button>
             </div>
@@ -224,59 +271,83 @@ const SaveToBoardDialog = ({ open, onOpenChange, pinId }: SaveToBoardDialogProps
           <>
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="w-full gap-2 mb-4"
+              className="w-full gap-2 mb-3"
               variant="outline"
             >
-              <Plus className="w-4 h-4" />
-              Create New Board
+              <Plus className="w-4 h-4" /> Create New Board
             </Button>
 
-            <ScrollArea className="h-[300px] pr-4">
+            <ScrollArea className="h-[300px] pr-2">
+              <div
+                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer mb-2"
+                onClick={handleSaveToProfile}
+              >
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                  {!imageError && userData?.profilePicture ? (
+                    <img
+                      src={userData.profilePicture}
+                      className="w-full h-full object-cover"
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <div className="text-2xl">👤</div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="font-medium">Save to Profile</p>
+                  <p className="text-sm text-muted-foreground">
+                    Save to your profile
+                  </p>
+                </div>
+              </div>
+
               {loading ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <p className="text-center text-muted-foreground py-4">
                   Loading boards...
-                </div>
-              ) : boards.length > 0 ? (
-                <div className="space-y-2">
-                  {boards.map((board) => {
-                    const isInBoard = isPinInBoard(board);
-                    return (
-                      <div
-                        key={board._id}
-                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent cursor-pointer transition-colors"
-                        onClick={() => isInBoard ? handleRemoveFromBoard(board._id) : handleAddToBoard(board._id)}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center text-2xl overflow-hidden">
-                            {board.coverImage || board.pins[0] ? (
-                              <img
-                                src={board.coverImage || (board.pins[0] as any)?.mediaUrl}
-                                alt={board.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              "📌"
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-foreground">{board.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {board.pins.length} pins
-                            </p>
-                          </div>
-                        </div>
-                        {isInBoard && (
-                          <Check className="w-5 h-5 text-primary" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                </p>
+              ) : boards.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No boards yet
+                </p>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="mb-2">No boards yet</p>
-                  <p className="text-sm">Create your first board to organize pins</p>
-                </div>
+                boards.map((board) => {
+                  const isIn = isPinInBoard(board);
+
+                  return (
+                    <div
+                      key={board._id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer mb-2"
+                      onClick={() =>
+                        isIn
+                          ? handleRemoveFromBoard(board._id)
+                          : handleAddToBoard(board._id)
+                      }
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                          {board.coverImage ? (
+                            <img
+                              src={board.coverImage}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            "📌"
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="font-medium">{board.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {board.pins.length} pins
+                          </p>
+                        </div>
+                      </div>
+
+                      {isIn && <Check className="w-5 h-5 text-primary" />}
+                    </div>
+                  );
+                })
               )}
             </ScrollArea>
           </>
