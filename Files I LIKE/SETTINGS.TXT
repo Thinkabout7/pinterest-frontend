@@ -38,7 +38,6 @@ const Settings = () => {
   const [newUsername, setNewUsername] = useState(user?.username || "");
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
-  const [newPassError, setNewPassError] = useState("");
 
   /* =========================================
       CHANGE USERNAME
@@ -66,19 +65,9 @@ const Settings = () => {
       CHANGE PASSWORD
   ========================================= */
   const handlePassword = async () => {
-    // client-side guard
-    if (newPass.length < 6) {
-      setNewPassError("Password must be at least 6 characters");
-      return;
-    }
-
     const result = await changePassword(oldPass, newPass);
 
     if (result.error) {
-      if (result.error === "Password must be at least 6 characters") {
-        setNewPassError(result.error);
-        return;
-      }
       return toast({
         title: "Error",
         description: result.error,
@@ -86,7 +75,6 @@ const Settings = () => {
       });
     }
 
-    setNewPassError("");
     toast({
       title: "Password updated",
       description: "Your password has been changed.",
@@ -313,23 +301,13 @@ const Settings = () => {
             type="password"
             placeholder="New password"
             value={newPass}
-            onChange={(e) => {
-              setNewPass(e.target.value);
-              if (e.target.value.length >= 6) setNewPassError("");
-            }}
+            onChange={(e) => setNewPass(e.target.value)}
             minLength={6}
             required
           />
-          <p className="text-sm text-muted-foreground mt-1">
-            Must be at least 6 characters.
-          </p>
-          {newPassError && (
-            <p className="text-sm text-destructive">{newPassError}</p>
-          )}
 
           <Button
             className="w-full mt-3"
-            disabled={newPass.length < 6 || oldPass.length === 0}
             onClick={() => setOpenConfirmPassSave(true)}
           >
             Continue

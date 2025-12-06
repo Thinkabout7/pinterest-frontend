@@ -34,7 +34,6 @@ const PinCard = ({
 }: PinCardProps) => {
   const navigate = useNavigate();
   const { isAuthenticated, token, user } = useAuth();
-  
   const { toast } = useToast();
 
   const [saved, setSaved] = useState(isSaved);
@@ -44,24 +43,13 @@ const PinCard = ({
     import.meta.env.VITE_API_URL ||
     "https://pinterest-backend-088x.onrender.com";
 
-  
-  const isDeactivated = user?.isDeactivated;
-  const block = () => {
-    toast({
-      title: "Account Deactivated",
-      description: "You cannot perform this action while your account is deactivated.",
-      variant: "destructive",
-    });
-  }
-  
-    useEffect(() => {
+  useEffect(() => {
     setSaved(isSaved);
   }, [isSaved]);
 
   const handleSaveToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (isDeactivated) return block()
     if (!isAuthenticated) {
       toast({
         title: "Login Required",

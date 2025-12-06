@@ -52,7 +52,7 @@ const SaveToBoardDialog = ({
   const [newBoardDescription, setNewBoardDescription] = useState("");
 
   const [creatingBoard, setCreatingBoard] = useState(false);
-  const [profileImgError, setProfileImgError] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const { toast } = useToast();
   const { token, user } = useAuth();
@@ -62,6 +62,14 @@ const SaveToBoardDialog = ({
     "https://pinterest-backend-088x.onrender.com";
 
   const userData = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const isDeactivated = user?.isDeactivated;
+  const block = () =>
+    toast({
+      title: "Account inactive",
+      description: "You must reactivate your account to save or create boards.",
+      variant: "destructive",
+    });
 
   useEffect(() => {
     if (open) fetchBoards();
@@ -88,6 +96,7 @@ const SaveToBoardDialog = ({
   };
 
   const handleCreateBoard = async () => {
+    if (isDeactivated) return block();
     if (!newBoardName.trim()) return;
 
     setCreatingBoard(true);
@@ -136,6 +145,8 @@ const SaveToBoardDialog = ({
   };
 
   const handleSaveToProfile = async () => {
+    if (isDeactivated) return block();
+
     try {
       const response = await fetch(`${apiUrl}/api/saved/profile/${pinId}`, {
         method: "POST",
@@ -161,6 +172,8 @@ const SaveToBoardDialog = ({
   };
 
   const handleAddToBoard = async (boardId: string) => {
+    if (isDeactivated) return block();
+
     try {
       const response = await fetch(
         `${apiUrl}/api/boards/${boardId}/pins/${pinId}`,
@@ -196,6 +209,8 @@ const SaveToBoardDialog = ({
   };
 
   const handleRemoveFromBoard = async (boardId: string) => {
+    if (isDeactivated) return block();
+
     try {
       const response = await fetch(
         `${apiUrl}/api/boards/${boardId}/pins/${pinId}`,
@@ -273,7 +288,10 @@ const SaveToBoardDialog = ({
         ) : (
           <>
             <Button
-              onClick={() => setShowCreateForm(true)}
+              onClick={() => {
+                if (isDeactivated) return block();
+                setShowCreateForm(true);
+              }}
               className="w-full gap-2 mb-3"
               variant="outline"
             >
@@ -286,11 +304,11 @@ const SaveToBoardDialog = ({
                 onClick={handleSaveToProfile}
               >
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                  {!profileImgError && userData?.profilePicture ? (
+                  {!imageError && userData?.profilePicture ? (
                     <img
                       src={userData.profilePicture}
                       className="w-full h-full object-cover"
-                      onError={() => setProfileImgError(true)}
+                      onError={() => setImageError(true)}
                     />
                   ) : (
                     <div className="text-2xl">👤</div>
@@ -316,10 +334,6 @@ const SaveToBoardDialog = ({
               ) : (
                 boards.map((board) => {
                   const isIn = isPinInBoard(board);
-                  const cover =
-                    board.coverImage ||
-                    board.pins?.[0]?.mediaUrl ||
-                    board.pins?.[0]?.image;
 
                   return (
                     <div
@@ -333,13 +347,13 @@ const SaveToBoardDialog = ({
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                          {cover ? (
+                          {board.coverImage ? (
                             <img
-                              src={cover}
+                              src={board.coverImage}
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-xl">📌</span>
+                            "📌"
                           )}
                         </div>
 

@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface Pin {
   _id: string;
@@ -52,16 +51,15 @@ const SaveToBoardDialog = ({
   const [newBoardDescription, setNewBoardDescription] = useState("");
 
   const [creatingBoard, setCreatingBoard] = useState(false);
-  const [profileImgError, setProfileImgError] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const { toast } = useToast();
-  const { token, user } = useAuth();
-
   const apiUrl =
     import.meta.env.VITE_API_URL ||
     "https://pinterest-backend-088x.onrender.com";
 
   const userData = JSON.parse(localStorage.getItem("user") || "{}");
+  const token = localStorage.getItem("auth_token");
 
   useEffect(() => {
     if (open) fetchBoards();
@@ -286,11 +284,11 @@ const SaveToBoardDialog = ({
                 onClick={handleSaveToProfile}
               >
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                  {!profileImgError && userData?.profilePicture ? (
+                  {!imageError && userData?.profilePicture ? (
                     <img
                       src={userData.profilePicture}
                       className="w-full h-full object-cover"
-                      onError={() => setProfileImgError(true)}
+                      onError={() => setImageError(true)}
                     />
                   ) : (
                     <div className="text-2xl">👤</div>
@@ -316,10 +314,6 @@ const SaveToBoardDialog = ({
               ) : (
                 boards.map((board) => {
                   const isIn = isPinInBoard(board);
-                  const cover =
-                    board.coverImage ||
-                    board.pins?.[0]?.mediaUrl ||
-                    board.pins?.[0]?.image;
 
                   return (
                     <div
@@ -333,13 +327,13 @@ const SaveToBoardDialog = ({
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                          {cover ? (
+                          {board.coverImage ? (
                             <img
-                              src={cover}
+                              src={board.coverImage}
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-xl">📌</span>
+                            "📌"
                           )}
                         </div>
 

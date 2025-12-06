@@ -94,10 +94,6 @@ const Auth = () => {
     setIsLoading(false);
 
     if (error) {
-      if (error === "Password must be at least 6 characters") {
-        setSignupErrors({ password: error });
-        return;
-      }
       toast({
         title: "Signup Failed",
         description: error,

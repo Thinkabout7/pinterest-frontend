@@ -20,13 +20,8 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ⭐️ NEW: detect deactivated user
-  const isDeactivated = user?.isDeactivated;
-
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    { text: string; snippet?: string }[]
-  >([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showOverlay, setShowOverlay] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -62,7 +57,7 @@ const Navbar = () => {
     setShowOverlay(false);
   };
 
-  // LIVE SUGGESTIONS
+  // LIVE SUGGESTIONS — SORTED BY PRIORITY
   useEffect(() => {
     if (!showOverlay || !query.trim()) {
       setSuggestions([]);
@@ -78,90 +73,33 @@ const Navbar = () => {
 
         const data = await res.json();
 
-        const cleanText = (str: string) =>
-          str
-            .replace(/<[^>]+>/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
+        let all = new Set<string>();
 
-        const truncate = (str: string, len = 120) =>
-          str.length > len ? str.slice(0, len - 1) + "…" : str;
+        data.pins.forEach((p: any) => {
+          if (p.title) all.add(p.title);
+          if (p.description) all.add(p.description);
+          if (p.tags) p.tags.forEach((t: string) => all.add(t));
+        });
 
-        const raw: any[] = data.suggestions || [];
-        const q = query.trim().toLowerCase();
+        const list = Array.from(all);
+        const q = query.toLowerCase();
 
-        const processedFromApi = raw
-          .map((s) => {
-            const base = cleanText(s?.suggestionText || "");
-            const snippet = cleanText(s?.descriptionSnippet || "");
-            if (!base) return null; // only use suggestionText for labels
-            return {
-              text: truncate(base, 120),
-              snippet: snippet ? truncate(snippet, 120) : undefined,
-            };
-          })
-          .filter(Boolean) as { text: string; snippet?: string }[];
-
-        // Order by priority: starts-with query first, then contains query, then the rest
-        const prioritize = (list: { text: string; snippet?: string }[]) => {
-          const seen = new Set<string>();
-          const starts = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return q && t.startsWith(q);
-          });
-          const contains = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return q && !t.startsWith(q) && t.includes(q);
-          });
-          const others = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return !q || (!t.startsWith(q) && !t.includes(q));
-          });
-
-          const ordered = [...starts, ...contains, ...others];
-          return ordered.filter((s) => {
-            const key = s.text.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        };
-
-        // Fallback: derive from pins if API suggestions are empty
-        let derived: { text: string; snippet?: string }[] = [];
-        if (processedFromApi.length === 0 && Array.isArray(data.pins)) {
-          const seen = new Set<string>();
-          for (const p of data.pins) {
-            const candidates = [
-              p.title,
-              p.description,
-              ...(Array.isArray(p.tags) ? p.tags : []),
-            ].filter(Boolean);
-
-            for (const c of candidates) {
-              const text = truncate(cleanText(String(c)), 120);
-              if (!text) continue;
-              if (seen.has(text.toLowerCase())) continue;
-              seen.add(text.toLowerCase());
-              derived.push({ text });
-              if (derived.length >= 7) break;
-            }
-            if (derived.length >= 7) break;
-          }
-        }
-
-        const prioritized = prioritize(
-          processedFromApi.length > 0 ? processedFromApi : derived
+        const startsWith = list.filter((t) => t.toLowerCase().startsWith(q));
+        const exact = list.filter((t) => t.toLowerCase() === q);
+        const includes = list.filter(
+          (t) => t.toLowerCase().includes(q) && !t.toLowerCase().startsWith(q)
         );
 
-        setSuggestions(prioritized.slice(0, 7));
+        const finalList = [...exact, ...startsWith, ...includes].slice(0, 7);
+
+        setSuggestions(finalList);
       } catch {}
     };
 
     load();
   }, [query, showOverlay]);
 
-  // Load unread notifications
+  // 🔴 LOAD UNREAD NOTIFICATIONS — FIXED
   useEffect(() => {
     const loadUnread = async () => {
       try {
@@ -213,8 +151,8 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Right side (normal users) */}
-        {isAuthenticated && !isDeactivated && (
+        {/* Right side */}
+        {isAuthenticated && (
           <div className="flex items-center gap-3">
             <Button onClick={() => navigate("/create")} size="sm" className="gap-2">
               <Plus className="w-4 h-4" /> Create
@@ -263,37 +201,6 @@ const Navbar = () => {
             </DropdownMenu>
           </div>
         )}
-
-        {/* ⭐️ NEW: Right side for DEACTIVATED USERS */}
-        {isAuthenticated && isDeactivated && (
-          <div className="flex items-center gap-3 ml-auto">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Avatar className="w-8 h-8">
-                    {user?.profilePicture ? (
-                      <AvatarImage src={user.profilePicture} />
-                    ) : (
-                      <AvatarFallback>{user?.username?.[0]}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="hidden md:inline">{user?.username}</span>
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate("/settings")}>
-                  <Settings className="mr-2 h-4 w-4" /> Reactivate Account
-                </DropdownMenuItem>
-
-                <DropdownMenuItem onClick={logout}>
-                  <LogOut className="mr-2 h-4 w-4" /> Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-
       </div>
 
       {/* Fullscreen overlay */}

@@ -22,6 +22,7 @@ interface CommentItemProps {
   replyUsername: string | null;
   replyInputOpen: boolean;
 
+  // NEW PROPS
   expanded: boolean;
   toggleReplies: (commentId: string) => void;
 
@@ -32,10 +33,6 @@ interface CommentItemProps {
   onCancelReply: () => void;
   onDelete: (commentId: string) => Promise<void>;
   depth: number;
-
-  // NEW: deactivated user blocking
-  isDeactivated?: boolean;
-  block?: () => void;
 }
 
 const CommentItem = ({
@@ -45,8 +42,10 @@ const CommentItem = ({
   replyingToCommentId,
   replyUsername,
   replyInputOpen,
+
   expanded,
   toggleReplies,
+
   onLike,
   onOpenReactions,
   onReply,
@@ -54,10 +53,6 @@ const CommentItem = ({
   onCancelReply,
   onDelete,
   depth,
-
-  // NEW props
-  isDeactivated = false,
-  block = () => {},
 }: CommentItemProps) => {
 
   if (!comment || !comment._id || !comment.user) {
@@ -126,10 +121,7 @@ const CommentItem = ({
 
                 {canDelete && (
                   <Button
-                    onClick={() => {
-                      if (isDeactivated) return block();
-                      onDelete(comment._id);
-                    }}
+                    onClick={() => onDelete(comment._id)}
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 hover:bg-destructive/10"
@@ -146,10 +138,7 @@ const CommentItem = ({
           {/* ACTIONS */}
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
             <button
-              onClick={() => {
-                if (isDeactivated) return block();
-                onLike(comment._id);
-              }}
+              onClick={() => onLike(comment._id)}
               className="flex items-center gap-1 hover:text-foreground transition"
             >
               <Heart
@@ -171,10 +160,9 @@ const CommentItem = ({
             )}
 
             <button
-              onClick={() => {
-                if (isDeactivated) return block();
-                onStartReply(comment._id, comment.user.username);
-              }}
+              onClick={() =>
+                onStartReply(comment._id, comment.user.username)
+              }
               className="hover:text-foreground transition"
             >
               Reply
@@ -208,7 +196,6 @@ const CommentItem = ({
               <div className="flex flex-col gap-2">
                 <Button
                   onClick={() => {
-                    if (isDeactivated) return block();
                     if (replyText.trim()) {
                       onReply(comment._id, replyText.trim());
                       setReplyText("");
@@ -221,11 +208,7 @@ const CommentItem = ({
                   <Send className="w-4 h-4" />
                 </Button>
 
-                <Button
-                  onClick={onCancelReply}
-                  variant="ghost"
-                  size="sm"
-                >
+                <Button onClick={onCancelReply} variant="ghost" size="sm">
                   <X className="w-4 h-4" />
                 </Button>
               </div>
@@ -246,7 +229,7 @@ const CommentItem = ({
               replyingToCommentId={replyingToCommentId}
               replyUsername={replyUsername}
               replyInputOpen={replyInputOpen}
-              expanded={expanded}
+              expanded={expanded}           // nested uses same system
               toggleReplies={toggleReplies}
               onLike={onLike}
               onOpenReactions={onOpenReactions}
@@ -255,8 +238,6 @@ const CommentItem = ({
               onCancelReply={onCancelReply}
               onDelete={onDelete}
               depth={depth + 1}
-              isDeactivated={isDeactivated}
-              block={block}
             />
           ))}
         </div>

@@ -40,14 +40,6 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
   const { user, token, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  const isDeactivated = user?.isDeactivated === true;
-  const block = () =>
-    toast({
-      title: "Account Disabled",
-      description: "Reactivate your account to use this feature.",
-      variant: "destructive",
-    });
-
   // 🔥 NEW: Reply expand state
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
 
@@ -85,10 +77,7 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
       {/* Add comment */}
       {!isCommentBoxOpen ? (
         <button
-          onClick={() => {
-            if (isDeactivated) return block();
-            setIsCommentBoxOpen(true);
-          }}
+          onClick={() => setIsCommentBoxOpen(true)}
           className="text-muted-foreground hover:text-foreground text-sm"
         >
           Add a comment...
@@ -124,10 +113,9 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
 
               <Button
                 size="sm"
-                disabled={!newComment.trim() || isAddingComment || isDeactivated}
+                disabled={!newComment.trim() || isAddingComment}
                 onClick={async () => {
                   if (!newComment.trim() || !token) return;
-                  if (isDeactivated) return block();
                   setIsAddingComment(true);
 
                   try {
@@ -167,12 +155,9 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
             depth={0}
             expanded={!!expandedComments[comment._id]}
             toggleReplies={toggleReplies}
-            isDeactivated={isDeactivated}
-            block={block}
 
             onLike={async (id) => {
               if (!token) return;
-              if (isDeactivated) return block();
               try {
                 await toggleLikeComment(id, token);
                 await loadComments();
@@ -201,7 +186,6 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
 
             onReply={async (parentId, text) => {
               if (!token || !text.trim()) return;
-              if (isDeactivated) return block();
               try {
                 await postReply(pinId, parentId, text.trim(), token);
                 await loadComments();
@@ -235,7 +219,6 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
 
             onDelete={async (id) => {
               if (!token) return;
-              if (isDeactivated) return block();
               try {
                 await deleteComment(id, token);
                 await loadComments();

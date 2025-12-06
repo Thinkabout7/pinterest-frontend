@@ -334,10 +334,10 @@ const Profile = () => {
                 if (val === "saved") loadSavedPins();
               }}
             >
-              <TabsList className={`grid ${isOwnProfile ? "grid-cols-3" : "grid-cols-2"} max-w-lg mx-auto`}>
+              <TabsList className="grid grid-cols-3 max-w-lg mx-auto">
                 <TabsTrigger value="created">Pins</TabsTrigger>
                 <TabsTrigger value="boards">Boards</TabsTrigger>
-                {isOwnProfile && <TabsTrigger value="saved">Saved</TabsTrigger>}
+                <TabsTrigger value="saved">Saved</TabsTrigger>
               </TabsList>
 
               {/* CREATED */}
@@ -399,33 +399,31 @@ const Profile = () => {
                 )}
               </TabsContent>
 
-              {/* SAVED (only for own profile) */}
-              {isOwnProfile && (
-                <TabsContent value="saved" className="mt-8">
-                  {savedPins.length ? (
-                    <MasonryGrid>
-                      {savedPins
-                      .filter((p) => p && p._id)
-                      .map((pin) => (
-                        <PinCard
-                          key={pin._id}
-                          id={pin._id}
-                          imageUrl={pin.mediaUrl}
-                          mediaType={pin.mediaType}
-                          title={pin.title}
-                          description={pin.description}
-                          isSaved={true}
-                          showSaveButton={true}
-                        />
-                      ))}
-                    </MasonryGrid>
-                  ) : (
-                    <p className="text-center py-12 text-muted-foreground">
-                      Nothing saved yet
-                    </p>
-                  )}
-                </TabsContent>
-              )}
+              {/* SAVED */}
+              <TabsContent value="saved" className="mt-8">
+                {savedPins.length ? (
+                  <MasonryGrid>
+                    {savedPins
+                    .filter((p) => p && p._id)
+                    .map((pin) => (
+                      <PinCard
+                        key={pin._id}
+                        id={pin._id}
+                        imageUrl={pin.mediaUrl}
+                        mediaType={pin.mediaType}
+                        title={pin.title}
+                        description={pin.description}
+                        isSaved={true}
+                        showSaveButton={true}
+                      />
+                    ))}
+                  </MasonryGrid>
+                ) : (
+                  <p className="text-center py-12 text-muted-foreground">
+                    Nothing saved yet
+                  </p>
+                )}
+              </TabsContent>
             </Tabs>
           </>
         )}

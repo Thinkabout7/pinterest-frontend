@@ -33,16 +33,6 @@ const PinDetail = () => {
   const navigate = useNavigate();
   const { user: currentUser, token } = useAuth();
   const { toast } = useToast();
-
-  // 🔥 ADDED — check if user is deactivated
-  const isDeactivated = currentUser?.isDeactivated === true;
-  const block = () =>
-    toast({
-      title: "Account Disabled",
-      description: "Reactivate your account to use this feature.",
-      variant: "destructive",
-    });
-
   const apiUrl =
     import.meta.env.VITE_API_URL ||
     "https://pinterest-backend-088x.onrender.com";
@@ -91,11 +81,8 @@ const PinDetail = () => {
     loadPin();
   }, [id, token]);
 
-  // ---------- LIKE PIN ----------
   const handleLike = async () => {
     if (!currentUser) return navigate("/auth");
-
-    if (isDeactivated) return block(); // 🔥 BLOCKED
 
     try {
       await fetch(`${apiUrl}/api/pins/${id}/likes`, {
@@ -155,7 +142,7 @@ const PinDetail = () => {
 
         <div className="max-w-5xl mx-auto bg-card rounded-3xl shadow-lg overflow-hidden">
           <div className="grid md:grid-cols-2">
-            {/* LEFT SIDE — MEDIA */}
+            {/* MEDIA */}
             <div className="bg-muted flex justify-center items-center p-8">
               {pin.mediaType === "image" ? (
                 <img
@@ -197,10 +184,9 @@ const PinDetail = () => {
                 </p>
               )}
 
-              {/* ACTIONS ROW */}
+              {/* ACTIONS */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-6">
-                  {/* LIKE BUTTON */}
                   <button
                     onClick={handleLike}
                     className="flex items-center gap-2"
@@ -215,7 +201,6 @@ const PinDetail = () => {
                     <span className="font-medium">{likesCount}</span>
                   </button>
 
-                  {/* COMMENTS TOGGLE */}
                   <button
                     onClick={() => setShowComments((v) => !v)}
                     className="flex items-center gap-2"
@@ -224,12 +209,8 @@ const PinDetail = () => {
                     <span>{commentCount}</span>
                   </button>
 
-                  {/* SHARE */}
                   <button
-                    onClick={() => {
-                      if (isDeactivated) return block(); // blocked for deactivated
-                      setShowShareModal(true);
-                    }}
+                    onClick={() => setShowShareModal(true)}
                     className="flex items-center gap-2"
                   >
                     <Share2 className="w-6 h-6" />
@@ -237,28 +218,20 @@ const PinDetail = () => {
                   </button>
                 </div>
 
-                {/* SAVE BUTTON */}
                 <div className="flex items-center gap-2">
                   <Button
-                    onClick={() => {
-                      if (isDeactivated) return block(); // 🔥 BLOCKED
-                      setShowSaveDialog(true);
-                    }}
+                    onClick={() => setShowSaveDialog(true)}
                     className="bg-red-600 hover:bg-red-700"
                   >
                     Save
                   </Button>
-
                   <MoreOptionsDropdown
                     imageUrl={pin.mediaUrl}
                     title={pin.title}
-                    disabled={isDeactivated}
-                    onDisabled={block}
                   />
                 </div>
               </div>
 
-              {/* COMMENTS SECTION */}
               {showComments && (
                 <CommentBox
                   pinId={pin._id}

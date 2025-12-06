@@ -28,16 +28,8 @@ const createPinSchema = z.object({
 });
 
 const createBoardSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Board name is required")
-    .max(50, "Board name must be less than 50 characters"),
-  description: z
-    .string()
-    .trim()
-    .max(300, "Description must be less than 300 characters")
-    .optional(),
+  name: z.string().trim().min(1, "Board name is required").max(50, "Board name must be less than 50 characters"),
+  description: z.string().trim().max(300, "Description must be less than 300 characters").optional(),
 });
 
 type CreatePinForm = z.infer<typeof createPinSchema>;
@@ -55,7 +47,7 @@ const categories = [
   "Nature",
   "Logo",
   "Screenshot",
-  "Other",
+  "Other"
 ];
 
 const Create = () => {
@@ -66,9 +58,7 @@ const Create = () => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
 
-  const apiUrl =
-    import.meta.env.VITE_API_URL ||
-    "https://pinterest-backend-088x.onrender.com";
+  const apiUrl = import.meta.env.VITE_API_URL || "https://pinterest-backend-088x.onrender.com";
 
   const pinForm = useForm<CreatePinForm>({
     resolver: zodResolver(createPinSchema),
@@ -136,9 +126,9 @@ const Create = () => {
       // Build the request using FormData
       const formData = new FormData();
       formData.append("media", selectedFile);
-      formData.append("title", data.title || "");
-      formData.append("description", data.description || "");
-      formData.append("category", data.category || "");
+      formData.append("title", data.title);
+      formData.append("description", data.description);
+      formData.append("category", data.category);
 
       // Send the request
       const response = await fetch(`${apiUrl}/api/pins`, {
@@ -159,6 +149,8 @@ const Create = () => {
         throw new Error(errorMessage);
       }
 
+      const result = await response.json();
+
       toast({
         title: "Success!",
         description: "Your pin has been created",
@@ -168,7 +160,7 @@ const Create = () => {
       pinForm.reset();
       setSelectedFile(null);
       setPreviewUrl("");
-      navigate("/home");
+      navigate("/");
     } catch (error) {
       toast({
         title: "Upload failed",
@@ -210,7 +202,7 @@ const Create = () => {
       if (user?.username) {
         navigate(`/profile/${user.username}`);
       } else {
-        navigate("/home");
+        navigate("/");
       }
     } catch (error) {
       toast({

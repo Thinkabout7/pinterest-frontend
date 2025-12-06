@@ -1,5 +1,4 @@
-// src/contexts/AuthContext.tsx
-
+//src/authcontext//
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface User {
@@ -54,127 +53,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // ===============================
-  // LOAD USER PROFILE
-  // ===============================
   const fetchUserProfile = async (authToken: string) => {
-    try {
-      const res = await fetch(`${apiUrl}/api/auth/profile`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
+  try {
+    const res = await fetch(`${apiUrl}/api/auth/profile`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
 
-      const data = await res.json().catch(() => null);
-      const storedUser = localStorage.getItem("user");
-
-      // Keep deactivated accounts authenticated so navbar can show the reactivation menu
-      if (res.status === 403) {
-        const u = data?.user || (storedUser ? JSON.parse(storedUser) : null);
-        if (u) {
-          const normalized: User = {
-            id: u._id,
-            username: u.username,
-            email: u.email,
-            profilePicture: u.profilePicture || null,
-            isDeactivated: true,
-          };
-          setUser(normalized);
-          localStorage.setItem("user", JSON.stringify(normalized));
-        }
-        setToken(authToken);
-        return;
-      }
-
-      // For other failures, log out
-      if (!res.ok) {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("user");
-        setUser(null);
-        setToken(null);
-        return;
-      }
-
-      const u = data?.user;
-      if (!u) return;
-
-      const normalized: User = {
-        id: u._id,
-        username: u.username,
-        email: u.email,
-        profilePicture: u.profilePicture || null,
-        isDeactivated: u.isDeactivated || false,
-      };
-
-      setUser(normalized);
-      localStorage.setItem("user", JSON.stringify(normalized));
-      setToken(authToken);
-
-    } catch (error) {
-      console.error("Fetch user profile failed:", error);
-    } finally {
-      setIsLoading(false);
+    if (!res.ok) {
+      localStorage.removeItem("auth_token");
+      return;
     }
-  };
 
-  // ===============================
-  // LOGIN
-  // ===============================
-  const login = async (identifier: string, password: string) => {
-    try {
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // backend accepts either email or username; send the identifier as both
-          email: identifier,
-          username: identifier,
-          password,
-        }),
-      });
+    const data = await res.json();
+    const u = data.user;
 
-      const data = await res.json();
-
-      // If backend returns 403 for a deactivated user, keep them authenticated and flag as deactivated
-      if (res.status === 403) {
-        if (data?.token) {
-          localStorage.setItem("auth_token", data.token);
-          setToken(data.token);
-        }
-        if (data?.user) {
-          const u = data.user;
-          const normalized: User = {
-            id: u._id,
-            username: u.username,
-            email: u.email,
-            profilePicture: u.profilePicture || null,
-            isDeactivated: true,
-          };
-          setUser(normalized);
-          localStorage.setItem("user", JSON.stringify(normalized));
-        }
-        if (data?.token) {
-          await fetchUserProfile(data.token);
-        }
-        return { error: data.message }; // "Account deactivated"
-      }
-
-      if (!res.ok) {
-        return { error: data.message };
-      }
-
-      localStorage.setItem("auth_token", data.token);
-      setToken(data.token);
-
-      await fetchUserProfile(data.token);
-      return {};
-
-    } catch {
-      return { error: "Network error" };
+    // Correct: block ONLY deactivated users
+    if (u.isDeactivated === true) {
+      
     }
-  };
 
-  // ===============================
-  // SIGNUP
-  // ===============================
+    const normalized = {
+      id: u._id,
+      username: u.username,
+      email: u.email,
+      profilePicture: u.profilePicture || null,
+      isDeactivated: u.isDeactivated || false,
+    };
+
+    setUser(normalized);
+    localStorage.setItem("user", JSON.stringify(normalized));
+    setToken(authToken);
+
+  } catch (error) {
+    console.error("Fetch user profile failed:", error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+  const login = async (email: string, password: string) => {
+  try {
+    const res = await fetch(`${apiUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+
+    // ❗ If account is deactivated, show message and stop
+    if (res.status === 403) {
+      return { error: data.message };  // "Your account is deactivated"
+    }
+
+    if (!res.ok) {
+      return { error: data.message };
+    }
+
+    localStorage.setItem("auth_token", data.token);
+    setToken(data.token);
+
+    await fetchUserProfile(data.token);
+    return {};
+
+  } catch {
+    return { error: "Network error" };
+  }
+};
+
   const signup = async (username: string, email: string, password: string) => {
     try {
       const res = await fetch(`${apiUrl}/api/auth/register`, {
@@ -197,22 +144,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ===============================
-  // UPDATE USER
-  // ===============================
   const updateUser = (updates: Partial<User>) => {
     setUser((prev) => {
       if (!prev) return prev;
 
       const updated = { ...prev, ...updates };
+
       localStorage.setItem("user", JSON.stringify(updated));
+
       return updated;
     });
   };
 
-  // ===============================
-  // LOGOUT
-  // ===============================
   const logout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user");
@@ -221,9 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = "/auth";
   };
 
-  // ===============================
-  // CHANGE USERNAME
-  // ===============================
+  // ---------------- CHANGE USERNAME ----------------
   const changeUsername = async (newUsername: string) => {
     if (!token) return { error: "No token" };
 
@@ -243,9 +184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {};
   };
 
-  // ===============================
-  // CHANGE PASSWORD
-  // ===============================
+  // ---------------- CHANGE PASSWORD ----------------
   const changePassword = async (currentPassword: string, newPassword: string) => {
     if (!token) return { error: "No token" };
 
@@ -264,54 +203,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return {};
   };
 
-  // ===============================
-  // DEACTIVATE
-  // ===============================
+  // ---------------- DEACTIVATE ACCOUNT ----------------
   const deactivateAccount = async () => {
     if (!token) return { error: "No token" };
 
     const res = await fetch(`${apiUrl}/api/auth/deactivate`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     const data = await res.json();
     if (!res.ok) return { error: data.message };
 
-    updateUser({ isDeactivated: true });
     return {};
   };
 
-  // ===============================
-  // REACTIVATE
-  // ===============================
+  // ---------------- REACTIVATE ACCOUNT ----------------
   const reactivateAccount = async () => {
     if (!token) return { error: "No token" };
 
     const res = await fetch(`${apiUrl}/api/auth/reactivate`, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     const data = await res.json();
     if (!res.ok) return { error: data.message };
 
-    updateUser({ isDeactivated: false });
-
-    // Refresh profile to clear any stale local state
-    await fetchUserProfile(token);
     return {};
   };
 
-  // ===============================
-  // DELETE ACCOUNT
-  // ===============================
+  // ---------------- DELETE ACCOUNT ----------------
   const deleteAccount = async () => {
     if (!token) return { error: "No token" };
 
     const res = await fetch(`${apiUrl}/api/auth/delete-account`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     const data = await res.json();
