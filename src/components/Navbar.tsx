@@ -24,9 +24,7 @@ const Navbar = () => {
   const isDeactivated = user?.isDeactivated;
 
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    { text: string; snippet?: string }[]
-  >([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showOverlay, setShowOverlay] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -77,84 +75,7 @@ const Navbar = () => {
         if (!res.ok) return;
 
         const data = await res.json();
-
-        const cleanText = (str: string) =>
-          str
-            .replace(/<[^>]+>/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-
-        const truncate = (str: string, len = 120) =>
-          str.length > len ? str.slice(0, len - 1) + "…" : str;
-
-        const raw: any[] = data.suggestions || [];
-        const q = query.trim().toLowerCase();
-
-        const processedFromApi = raw
-          .map((s) => {
-            const base = cleanText(s?.suggestionText || "");
-            const snippet = cleanText(s?.descriptionSnippet || "");
-            if (!base) return null; // only use suggestionText for labels
-            return {
-              text: truncate(base, 120),
-              snippet: snippet ? truncate(snippet, 120) : undefined,
-            };
-          })
-          .filter(Boolean) as { text: string; snippet?: string }[];
-
-        // Order by priority: starts-with query first, then contains query, then the rest
-        const prioritize = (list: { text: string; snippet?: string }[]) => {
-          const seen = new Set<string>();
-          const starts = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return q && t.startsWith(q);
-          });
-          const contains = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return q && !t.startsWith(q) && t.includes(q);
-          });
-          const others = list.filter((s) => {
-            const t = s.text.toLowerCase();
-            return !q || (!t.startsWith(q) && !t.includes(q));
-          });
-
-          const ordered = [...starts, ...contains, ...others];
-          return ordered.filter((s) => {
-            const key = s.text.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        };
-
-        // Fallback: derive from pins if API suggestions are empty
-        let derived: { text: string; snippet?: string }[] = [];
-        if (processedFromApi.length === 0 && Array.isArray(data.pins)) {
-          const seen = new Set<string>();
-          for (const p of data.pins) {
-            const candidates = [
-              p.title,
-              p.description,
-              ...(Array.isArray(p.tags) ? p.tags : []),
-            ].filter(Boolean);
-
-            for (const c of candidates) {
-              const text = truncate(cleanText(String(c)), 120);
-              if (!text) continue;
-              if (seen.has(text.toLowerCase())) continue;
-              seen.add(text.toLowerCase());
-              derived.push({ text });
-              if (derived.length >= 7) break;
-            }
-            if (derived.length >= 7) break;
-          }
-        }
-
-        const prioritized = prioritize(
-          processedFromApi.length > 0 ? processedFromApi : derived
-        );
-
-        setSuggestions(prioritized.slice(0, 7));
+        setSuggestions(data.suggestions || []);
       } catch {}
     };
 
