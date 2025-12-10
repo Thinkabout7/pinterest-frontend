@@ -76,8 +76,16 @@ export const deleteComment = async (commentId: string, token: string) => {
 };
 
 /* GET USERS WHO LIKED COMMENT (REACTIONS) */
-export const getCommentLikes = async (commentId: string): Promise<UserType[]> => {
-  const res = await fetch(`${apiUrl}/api/comments/${commentId}/likes`);
+export const getCommentLikes = async (
+  commentId: string,
+  token?: string | null
+): Promise<UserType[]> => {
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${apiUrl}/api/comments/${commentId}/likes`, {
+    headers,
+  });
 
   if (!res.ok) throw new Error("Failed to load reactions");
   const data = await res.json();

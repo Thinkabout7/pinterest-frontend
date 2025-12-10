@@ -187,7 +187,7 @@ const CommentBox = ({ pinId, pinOwnerId, onCommentsChange }: CommentBoxProps) =>
 
             onOpenReactions={async (id) => {
               try {
-                const users = await getCommentLikes(id);
+                const users = await getCommentLikes(id, token);
                 setReactionUsers(users);
                 setReactionsModalOpen(true);
               } catch {
