@@ -1,10 +1,32 @@
-# Pinterest Clone — Frontend
+This project is the frontend of a Pinterest-style image sharing web application. It allows users to create accounts, upload images or short videos, create boards, save pins, like and comment on posts, and follow other users.
 
-This project is the frontend for a Pinterest-style image sharing web application. It allows users to create profiles, upload images or short videos, like and comment on pins, follow other users, create boards, and save pins for later viewing. The frontend is built using React with TypeScript, Vite, and Tailwind CSS, and it connects to a backend powered by Node.js, Express, MongoDB (Atlas), and Cloudinary for media uploads. The application is deployed with the frontend on Netlify and the backend on Render. Users can register, log in, and log out of their accounts. They can create and edit personal boards, upload and manage pins that can be images or videos, like and comment on other users’ pins, follow and unfollow users, and save pins for later viewing. The grid layout is responsive and adapts to all screen sizes, similar to Pinterest’s interface. To set up the environment, create a .env file in the project root with the following values:
+The frontend is built using React with TypeScript, Vite, and Tailwind CSS. It connects to a backend API built with Node.js, Express, MongoDB (Atlas), and Cloudinary for media storage. The user interface is responsive and adapts to different screen sizes, following a grid-based layout similar to Pinterest.
 
-VITE_API_URL=https://pinterest-backend-088x.onrender.com  
-VITE_SUPABASE_PROJECT_ID=  
-VITE_SUPABASE_PUBLISHABLE_KEY=  
+## Features
+- User authentication (register, login, logout)
+- Create and manage boards
+- Upload image and video pins
+- Like and comment on pins
+- Follow and unfollow users
+- Save pins for later viewing
+- Fully responsive layout
+
+## Tech Stack
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+-  Vercel (Frontend deployment)
+- Render (Backend deployment)
+
+## Environment Variables
+To run the project locally, create a .env file in the project root with the following variables:
+
+```env
+VITE_API_URL=https://pinterest-backend-088x.onrender.com
+VITE_SUPABASE_PROJECT_ID=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_SUPABASE_URL=
 
-To run the project locally, install dependencies with npm install and start the development server using npm run dev. The application will be available at http://localhost:5173. To prepare for production, use npm run build to generate optimized static files. The folder structure follows a modular layout, with separate folders for components, pages, contexts, hooks, and libraries inside the src directory, and all public assets stored in the public directory. This architecture makes it easy to extend features such as boards, saved pins, and notifications in the future. The entire project is part of a larger Pinterest-style ecosystem that integrates a backend API for handling authentication, image management, and user interactions efficiently.
+## Live Demo
+https://pinterest-fawn.vercel.app
