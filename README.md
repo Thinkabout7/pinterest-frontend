@@ -23,9 +23,10 @@ The frontend is built using React with TypeScript, Vite, and Tailwind CSS. It co
 -  Vercel (Frontend deployment)
 - Render (Backend deployment)
 
-## Environment Variables
-To run the project locally, create a .env file in the project root with the following variables:
+## Backend API
+https://pinterest-backend-088x.onrender.com
 
+## Environment Variables
 ```env
 VITE_API_URL=https://pinterest-backend-088x.onrender.com
 VITE_SUPABASE_PROJECT_ID=
